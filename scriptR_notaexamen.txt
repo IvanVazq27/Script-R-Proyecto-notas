@@ -1,0 +1,355 @@
+
+
+#Instalación paquetes necesarios para o desenvolvemento do traballo.
+install.packages ("lmtest")
+install.packages("car")
+library(lmtest)
+library(car)
+
+set.seed(123) #Fixamos unha semente para traballar sempre sobre a mesma mostra. 
+muestra<- read.csv("basededatos.csv",header=TRUE) #lectura de datos
+datos<-muestra[sample(nrow(muestra),size=500,replace=F),] #Reducimos o numero de datos
+head(datos) #Imprimimos as primeiras observacións da mostra reducida 
+attach(datos) #Transforma o noso conxunto de datos nun data frame
+names(datos) #Comprobamos os nomes das nosas variables
+
+#Convertimos as variables tipo de escola e Actividades extraescolares en variables que tomen valores 0 ou 1.
+datos$Actividades.extraescolares<-factor(datos$Actividades.extraescolares,levels=c("Yes","No"),labels=c(1,0)) #Yes<- 1, No <-0
+datos$Tipo.de.escola<-factor(datos$Tipo.de.escola,levels=c("Public","Private"),labels=c(1,0)) #Public<-1, Private <-0
+
+##REGRESIÓN LINEAR##
+
+modelo0<-lm(Nota.exame~Horas.de.estudo+Asistencia +Horas.de.sono +Nota.previa +Actividade.física) #Axuste do modelo sen as variables categóricas
+summary(modelo0) #Obtemos un resumo dos coeficientes do modelo asi como a sua significación e outros datos de interese como o R^2
+
+windows()
+par(mfrow=c(2,2)) #Creamos unha ventá a parte divida en 4 seccións para amosar as distintas gráficas do plot
+plot(modelo0) #Mostramos na ventá creada distintas gráficas do modelo.
+
+##########
+
+#Analise de atípicos e influintes
+#Con capacidade de influencia
+leverages <- hatvalues(modelo0) # Diagonal de la matriz hat: H=X(Xt*X)^(-1)*Xt
+n <- dim(model.matrix(modelo0))[1] #Número de observaciones
+p <- dim(model.matrix(modelo0))[2] #Número de parametros estimados (Beta0, Beta1,...,Beta6)
+which(leverages >= 2*p/n) #Observacións con capacidade de influencia
+length(which(leverages>=2*p/n)) #Número de observacións con capacidade de influencia (17)
+
+#atipicos
+res_stand <- rstandard(modelo0) # Residuos estandarizados
+res_stu <- rstudent(modelo0) # Residuos estudentizados
+which(abs(res_stand) > 1.96);length(which(abs(res_stand) > 1.96)) #Residuos estandarizados que superen o umbral de 1.96 que corresponde a unha significación de 0.05
+which(abs(res_stu) > 1.96);length(which(abs(res_stand) > 1.96)) #Residuos studentizados que superen o umbral de 1.96 que corresponde a unha significación de 0.05 
+#5 observacións atípicas
+
+#Influientes
+med <- qf(0.5, p, n-p) #Cota que utilizaremos para atopar observacións influintes
+which(cooks.distance(modelo0) > med) #Observaciónsinfluintes baseándonos na distancia de cook e na cota mencionada
+max(cooks.distance(modelo0)) #Mostramos o valor máximo para asegurarnos que o resultado é coherente
+#Non hai observacións influintes, non retiramos observacións da mostra
+
+##########
+
+#Comprobación das hipóteses do modelo
+# Normalidade:
+shapiro.test(rstandard(modelo0)); shapiro.test(rstudent(modelo0)) #Comprobación da normalidade mediante o test de Shapiro-Wilk.
+#P-valor moi baixo, rexeitamos normalidade
+
+# Homocedasticidade:
+bptest(modelo0) #Comprobación da homocedasticidade mediante o test de Breusch Pagan.
+hmctest(modelo0) #Comprobación da homocedasticidade mediante o test de Harrison McCabe
+#P-valores altos, non rexeitamos homocedasticidade
+
+# Linealidad:
+windows()
+plot(Nota.exame ~ fitted(modelo0)) #representación dos datos reais fronte aos esperados
+resettest(modelo0) #Comprobación da linealidade mediante o test RESET (Regression Equation Specification Error Test) de Ramsey
+harvtest(modelo0) #Comprobación da linealidade mediante o test de Harvey-Collier
+#P-valores altos non rexeitamos linealidade
+
+#Colinealidad
+vif(modelo0) #Cálculo do factor de inflación da varianza para ver se existe ou non colinealidade.
+#Todos os valores arredor de 1, non haberá colinealidade
+
+##########
+
+#Intervalos de confianza para cada coeficiente
+confint(modelo0,level=0.95)
+
+##########
+
+#Selección do modelo
+step(modelo0) #Tomamos en base ao AIC o modelo máis simple que explique a variable resposta
+#Seleccionamos o modelo que non toma as horas de sono
+
+#repetimos o mesmo, pero esta vez usando a función anova
+modelo1<-lm(Nota.exame~Horas.de.estudo+Asistencia+Nota.previa+Actividade.física) #Axustamos un novo modelo sen Horas de sono
+summary(modelo1)
+anova(modelo1,modelo0) #Compara ambos modelos. Tomamos o simplificado como o mellor modelo
+##########
+
+modelo2<-lm(Nota.exame~Horas.de.estudo+Asistencia+Nota.previa+Actividade.física) #novo modelo
+summary(modelo2)
+windows()
+par(mfrow=c(2,2))
+plot(modelo2)
+
+##########
+
+#Análise de atípicos e influíntes
+#Con capacidade de influencia
+leverages <- hatvalues(modelo2) # Diagonal de la matriz hat: H=X(Xt*X)^(-1)*Xt
+n <- dim(model.matrix(modelo2))[1] #Número de observaciones
+p <- dim(model.matrix(modelo2))[2] #Número de parametros estimados (Beta0, Beta1,...,Beta6)
+which(leverages >= 2*p/n) #Observacións con capacidade de influencia
+length(which(leverages>=2*p/n)) #Número de observacións con capacidade de influencia (17)
+
+#atípicos
+res_stand <- rstandard(modelo2) # Residuos estandarizados
+res_stu <- rstudent(modelo2) # Residuos estudentizados
+which(abs(res_stand) > 1.96);length(which(abs(res_stand) > 1.96)) #Residuos estandarizados que superen o umbral de 1.96 que corresponde a unha significación de 0.05
+which(abs(res_stu) > 1.96);length(which(abs(res_stand) > 1.96)) #Residuos studentizados que superen o umbral de 1.96 que corresponde a unha significación de 0.05 
+
+#Influíntes
+med <- qf(0.5, p, n-p) #Cota que utilizaremos para atopar observacións influintes
+which(cooks.distance(modelo2) > med) #Observaciónsinfluintes baseándonos na distancia de cook e na cota mencionada
+max(cooks.distance(modelo2)) #Mostramos o valor máximo para asegurarnos que o resultado é coherente
+
+##########
+
+#Comprobación das hipóteses do modelo
+# Normalidade:
+shapiro.test(rstandard(modelo2)); shapiro.test(rstudent(modelo2)) #Comprobación da normalidade mediante o test de Shapiro-Wilk.
+
+# Homocedasticidade:
+bptest(modelo2) #Comprobación da homocedasticidade mediante o test de Breusch Pagan.
+hmctest(modelo2) #Comprobación da homocedasticidade mediante o test de Harrison McCabe
+
+# Linealidade:
+windows()
+plot(Nota.exame ~ fitted(modelo2)) #representación dos datos reais fronte aos esperados
+resettest(modelo2) #Comprobación da linealidade mediante o test RESET (Regression Equation Specification Error Test) de Ramsey
+harvtest(modelo2) #Comprobación da linealidade mediante o test de Harvey-Collier
+
+#Colinealidade
+vif(modelo2) #Cálculo do factor de inflación da varianza para ver se existe ou non colinealidade.
+
+#Mesmas conclusións que antes 
+
+##########
+
+#Intervalos de confianza para cada coeficiente
+confint(modelo2,level=0.95)
+
+##MODELO ANOVA##
+
+#Para tipo de escola
+mod0<- lm(Nota.exame ~ 1) #Modelo onde non temos en conta o tipo de escola, soamente axusta a media do modelo
+mod1 <- lm(Nota.exame ~ Tipo.de.escola) #Modelo onde tomamos a escola privada como referencia
+summary(mod1) #Resumo do modelo
+mod2 <- lm(Nota.exame ~ Tipo.de.escola-1) #Modelo onde non se toma ningún grupo de referencia
+summary(mod2) 
+anova(mod1) #análise da varianza coa función anova de mod1
+anova(mod2) #análise da varianza coa función anova de mod2
+
+anova(mod0,mod1) #Comparación do modelo onde non consideramos distinción entre grupos co mod1
+anova(mod0,mod2) #Comparación do modelo onde non consideramos distinción entre grupos co mod2
+#escollemos o modelo simplificado
+
+# Método de Tukey:
+TukeyHSD(aov(Nota.exame~ Tipo.de.escola)) #Comparacións múltiples entre as medias dos grupos mediante a test de Tukey
+#p-valor alto, non rexeitamos que as medias sexan iguais
+# Contrastes múltiples:
+pairwise.t.test(Nota.exame,Tipo.de.escola) # Método Holm por defecto
+pairwise.t.test(Nota.exame,Tipo.de.escola,p.adjust.method="bonferroni") # Método Bonferroni
+pairwise.t.test(Nota.exame,Tipo.de.escola,p.adjust.method="BH") # Método Benjamini & Hochber
+#p-valor alto, non rexeitamos que as medias sexan iguais
+
+#Análise de atípicos e influintes
+n <- dim(model.matrix(mod1))[1]
+p <- dim(model.matrix(mod1))[2]
+#atipicos
+res_stand <- rstandard(mod1) # Residuos estandarizados
+res_stu <- rstudent(mod1) # Residuos estudentizados
+which(abs(res_stand) > 1.96);length(which(abs(res_stand) > 1.96))
+which(abs(res_stu) > 1.96);
+#17 observacións atípicas
+
+#Influientes
+med <- qf(0.5, p, n-p)
+which(cooks.distance(mod1) > med)
+max(cooks.distance(mod1))
+#Non hai observacións influintes
+
+##########
+
+#Comprobación das hipóteses do modelo
+Publica <- datos$Nota.exame[datos$Tipo.de.escola=="1"]
+Privada <- datos$Nota.exame[datos$Tipo.de.escola=="0"]
+
+#Normalidade de todolos grupos
+shapiro.test(Publica) #p-valor alto, non rexeitamos normalidade
+shapiro.test(Privada) #p-valor de 0.05461, non rexeitamos normalidade para niveles de confianza habituais
+
+
+#Homocedasticidade de todolos grupos:
+abs_res <- abs(mod1$residuals) #residuos do modelo
+levene_modelo <- lm(abs_res ~ Tipo.de.escola) #Axustamos un modelo onde tratamos de explicar os residuos mediante o tipo de escola
+anova(levene_modelo) #análise da varianza coa función anova do modelo dos residuos
+#P-valor alto non rexeitamos a homocedasticidade nos grupos
+
+##########
+
+#Para actividades extraescolares
+mod0<-lm(Nota.exame ~ 1)
+mod1 <- lm(Nota.exame ~ Actividades.extraescolares)
+mod2 <- lm(Nota.exame~Actividades.extraescolares-1)
+summary(mod1) 
+summary(mod2)
+anova(mod1)
+anova(mod2)
+anova(mod0,mod2)
+anova(mod0,mod1)
+#Consideramos os modelos complexos como mellores
+
+# Método de Tukey:
+TukeyHSD(aov(Nota.exame~ Actividades.extraescolares)) 
+#p-valor baixo rexeitamos que as medias sexan iguais
+
+# Contrastes múltiples:
+pairwise.t.test(Nota.exame,Actividades.extraescolares) # Método Holm por defecto
+pairwise.t.test(Nota.exame,Actividades.extraescolares,p.adjust.method="bonferroni") # Método Bonferroni
+pairwise.t.test(Nota.exame,Actividades.extraescolares,p.adjust.method="BH") # Método Benjamini & Hochber
+#p-valor baixo rexeitamos que as medias sexan iguais
+
+#Análise de atípicos e influintes
+n <- dim(model.matrix(mod1))[1]
+p <- dim(model.matrix(mod1))[2]
+
+#atipicos
+res_stand <- rstandard(mod1) # Residuos estandarizados
+res_stu <- rstudent(mod1) # Residuos estudentizados
+which(abs(res_stand) > 1.96);length(which(abs(res_stand) > 1.96))
+which(abs(res_stu) > 1.96) 
+#Temos 20 observacións atípicas
+
+#Influientes
+med <- qf(0.5, p, n-p)
+which(cooks.distance(mod1) > med)
+max(cooks.distance(mod1))
+#Non hai observacións atípicas
+##########
+
+#Comprobación das hipóteses do modelo
+Extra <- datos$Nota.exame[datos$Actividades.extraescolares=="1"]
+NoExtra <- datos$Nota.exame[datos$Actividades.extraescolares=="0"]
+
+#Normalidade de todolos grupos
+shapiro.test(Extra) 
+shapiro.test(NoExtra)
+#P-valor baixo, temos evidencias para rexeitar a normalidade
+
+#Homocedasticidade de todolos grupos:
+abs_res <- abs(mod1$residuals)
+levene_modelo <- lm(abs_res ~ Actividades.extraescolares)
+anova(levene_modelo)
+#P-valor alto, non temos evidencias para rexeitar a homocedasticidade
+
+##MODELO ANCOVA## 
+
+#Nesta sección imos incluir unicamente dúas variables continuas, Horas de estudo e asistencia.
+
+#ACTIVIDADES EXTRAESCOLARES
+
+#Sen interaccion para actividades extraescolares
+mod_ancova<-lm(Nota.exame ~ Actividades.extraescolares +Horas.de.estudo+Asistencia) #Axustamos un modelo sen interacción
+summary(mod_ancova) #Obtemos o resumo do modelo.
+
+# Test F:
+mod_H0 <- lm(Nota.exame ~ Actividades.extraescolares) #Axustamos un modelo que dependa únicamente de Actividades Extraescolares
+anova(mod_H0, mod_ancova) #Escollemos o mellor modelo
+
+mod_H0 <- lm(Nota.exame ~ Horas.de.estudo+Asistencia ) #Axustamos un modelo que dependa únicamente das variables continuas
+anova(mod_H0, mod_ancova) #Escollemos o mellor modelo de novo
+#En ambos casos, quedamos co modelo complexo pois temos un p-valor moi baixo.
+
+#Con interacción para Actividades extraescolares
+mod_ancova_1 <- lm(Nota.exame ~ Actividades.extraescolares*Horas.de.estudo+Asistencia) #Interacción en Horas de estudo
+summary(mod_ancova_1)
+mod_ancova_2 <- lm(Nota.exame ~ Actividades.extraescolares+Horas.de.estudo+Actividades.extraescolares*Asistencia) #Interacción en Asistencia
+summary(mod_ancova_2)
+mod_ancova_3 <- lm(Nota.exame ~ Actividades.extraescolares+Horas.de.estudo*Actividades.extraescolares*Asistencia) #Interacción en ambos
+summary(mod_ancova_3)
+
+anova(mod_ancova_3,mod_ancova_1) #Escollemos o mellor modelo entre o 1 e o 3
+anova(mod_ancova_3,mod_ancova_2) #Escollemos o mellor modelo entre o 2 e o 3
+#Quedamos cos modelos simplificados 
+summary(mod_ancova_2)
+summary(mod_ancova_1)
+#Mostramos os resumos de ambolos dous modelos para comparar o R^2
+#Escollemos o mod_ancova_2
+
+anova(mod_ancova_2,mod_ancova) #Escollemos o mellor modelo
+#Quedamos co modelo simple
+
+##########
+#Intervalo de confianza
+confint(mod_ancova)
+##########
+#Comprobación das hipóteses do modelo
+res <- rstandard(mod_ancova) #Calcula os erros estandarizados do modelo 
+yhat <- mod_ancova$fitted.values #Matriz dos valores do noso axuste
+windows()
+plot(res ~ yhat); abline(h=0) #Gráfica dos residuos fronte aos valores esperados 
+qqPlot(res) #Gráfica que compara os cuantís dos residuos cos cuantís dunha distribución normal
+shapiro.test(res) ##Comprobación da normalidade dos residuos mediante o test de Shapiro-Wilk.
+windows()
+par(mfrow=c(2,2))
+plot(mod_ancova)
+
+#TIPO DE ESCOLA. O PROCESO É O MESMO. 
+
+#Sen interacción para tipo de escola 
+mod_ancova<-lm(Nota.exame ~ Tipo.de.escola +Horas.de.estudo+Asistencia)
+summary(mod_ancova)
+
+# Test F:
+mod_H0 <- lm(Nota.exame ~ Tipo.de.escola) 
+anova(mod_H0, mod_ancova) 
+mod_H0 <- lm(Nota.exame ~ Horas.de.estudo+Asistencia) 
+anova(mod_H0, mod_ancova) 
+#Quedamos co modelo complexo
+
+#Con interacción para tipo de escola
+mod_ancova_1 <- lm(Nota.exame ~ Tipo.de.escola*Horas.de.estudo+Asistencia) #Interacción en Horas de estudo
+summary(mod_ancova_1)
+mod_ancova_2 <- lm(Nota.exame ~ Tipo.de.escola+Horas.de.estudo+Tipo.de.escola*Asistencia) #Interacción en Asistencia
+summary(mod_ancova_2)
+mod_ancova_3 <- lm(Nota.exame ~ Tipo.de.escola*Horas.de.estudo+Tipo.de.escola*Asistencia) #Interacción en ambos
+summary(mod_ancova_3)
+#Quedamos cos modelos complexos
+
+anova(mod_ancova_3,mod_ancova_1) 
+anova(mod_ancova_3,mod_ancova_2)
+#En base a R^2 escollemos o mod_ancova_2
+
+summary(mod_ancova_2)
+summary(mod_ancova_1) 
+anova(mod_ancova_1,mod_ancova) 
+#Escollemos o mod_ancova 
+
+#Intervalo de confianza
+confint(mod_ancova)
+##########
+
+#Comprobación das hipóteses do modelo
+res <- rstandard(mod_ancova) #Calcula os erros estandarizados do modelo 
+yhat <- mod_ancova$fitted.values #Matriz dos valores do noso axuste
+windows()
+plot(res ~ yhat); abline(h=0) #Gráfica dos residuos fronte aos valores esperados 
+qqPlot(res) #Gráfica que compara os cuantís dos residuos cos cuantís dunha distribución normal
+shapiro.test(res) ##Comprobación da normalidade dos residuos mediante o test de Shapiro-Wilk.
+windows()
+par(mfrow=c(2,2))
+plot(mod_ancova)
